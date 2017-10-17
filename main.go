@@ -25,6 +25,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
 	"os"
+	"time"
 )
 
 type Config struct {
@@ -51,6 +52,8 @@ func main() {
 		}
 		os.Exit(exitCode)
 	}
+
+	fmt.Println(GetRequest(config.APIKey, time.Now(), Datasets[0]))
 }
 
 func getConfig() (*Config, *conflag.Config) {
@@ -78,6 +81,7 @@ func getConfig() (*Config, *conflag.Config) {
 
 	parser.Field("APIKey").
 		ShortFlag('k').
+		FileKey("api_key").
 		Required().
 		Description("API key for Quandl.")
 
