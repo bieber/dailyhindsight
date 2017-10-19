@@ -53,6 +53,17 @@ func main() {
 		os.Exit(exitCode)
 	}
 
+	i := 0
+	RunLimited(func(v Dataset) {
+		fmt.Println(i)
+		i++
+
+		_, err := GetRequest(config.APIKey, time.Now(), v)
+		if err != nil {
+			fmt.Println(err)
+		}
+	})
+
 	fmt.Println(GetRequest(config.APIKey, time.Now(), Datasets[0]))
 }
 
