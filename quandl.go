@@ -37,8 +37,8 @@ func init() {
 }
 
 type RequestResult struct {
-	oldValue, newValue float64
-	oldTime, newTime   time.Time
+	OldValue, NewValue float64
+	OldTime, NewTime   time.Time
 }
 
 func GetRequest(
