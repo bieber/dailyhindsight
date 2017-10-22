@@ -24,7 +24,10 @@ import (
 	"github.com/bieber/conflag"
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
+	"math/rand"
 	"os"
+	"sync"
+	"time"
 )
 
 type Config struct {
@@ -34,6 +37,8 @@ type Config struct {
 	TempFile string
 	LogFile  string
 }
+
+const maxCacheAge = time.Hour * 24
 
 func main() {
 	config, parser := getConfig()
@@ -51,6 +56,44 @@ func main() {
 		}
 		os.Exit(exitCode)
 	}
+
+	if config.LogFile != "" {
+		fout, err := os.OpenFile(
+			config.LogFile,
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+			0644,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer fout.Close()
+		log.SetOutput(fout)
+	}
+
+	rand.Seed(time.Now().Unix())
+
+	selection, selectionLock := DailySelection{}, sync.RWMutex{}
+
+	if cacheFin, err := os.Open(config.TempFile); err != nil {
+		log.Println("No cache file found, loading synchronously")
+		SelectSynchronously(*config, &selection, &selectionLock)
+	} else {
+		selection, err = ReadBackup(cacheFin)
+		cacheFin.Close()
+		if err != nil {
+			log.Println("Error reading cache file, loading synchronously")
+			SelectSynchronously(*config, &selection, &selectionLock)
+		} else if time.Now().Sub(selection.Time) >= maxCacheAge {
+			log.Println("Cache file is too old, loading synchronously")
+			SelectSynchronously(*config, &selection, &selectionLock)
+		} else {
+			log.Println("Loaded cache from", selection.Time)
+		}
+	}
+
+	selectionChannel := StartSelector(*config, &selection, &selectionLock)
+	selectionChannel <- true
+	time.Sleep(time.Second)
 }
 
 func getConfig() (*Config, *conflag.Config) {

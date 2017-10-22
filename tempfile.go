@@ -21,14 +21,14 @@ package main
 
 import (
 	"encoding/gob"
-	"time"
 	"io"
+	"time"
 )
 
 type DailySelection struct {
 	Dataset
 	RequestResult
-	Time time.Time
+	time.Time
 }
 
 func WriteBackup(fout io.Writer, selection DailySelection) error {
@@ -41,7 +41,7 @@ func ReadBackup(fin io.Reader) (DailySelection, error) {
 	decoder := gob.NewDecoder(fin)
 	err := decoder.Decode(&out)
 	if err != nil {
-		return DailySelection {}, err
+		return DailySelection{}, err
 	}
 	return out, nil
 }
