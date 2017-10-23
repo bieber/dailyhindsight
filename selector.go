@@ -33,26 +33,13 @@ const selectTopN = 20
 
 type selectionList []DailySelection
 
-func StartSelector(
-	config Config,
-	selection *DailySelection,
-	selectionLock *sync.RWMutex,
-) chan<- bool {
-	c := make(chan bool, maxQueuedSelections)
-	go func() {
-		for {
-			<-c
-			SelectSynchronously(config, selection, selectionLock)
-		}
-	}()
-	return c
-}
-
 func SelectSynchronously(
 	config Config,
 	selection *DailySelection,
 	selectionLock *sync.RWMutex,
 ) {
+	log.Println("Beginning selection process")
+
 	results := []DailySelection{}
 	fetchTime := time.Now()
 	RunLimited(func(set Dataset) {
@@ -63,13 +50,9 @@ func SelectSynchronously(
 		}
 
 		results = append(results, DailySelection{set, result, fetchTime})
-		log.Println(DailySelection{set, result, fetchTime})
 	})
 
 	sort.Sort(sort.Reverse(selectionList(results)))
-	for _, s := range results {
-		log.Printf("%s:%s %f", s.Database, s.Dataset.Dataset, s.NewValue/s.OldValue)
-	}
 
 	selectionLock.Lock()
 	*selection = results[rand.Intn(selectTopN)]
@@ -85,6 +68,8 @@ func SelectSynchronously(
 	if err != nil {
 		log.Println("Error writing selection cache")
 	}
+
+	log.Println("Completed selection process")
 }
 
 func (l selectionList) Len() int {

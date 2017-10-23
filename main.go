@@ -38,8 +38,6 @@ type Config struct {
 	LogFile  string
 }
 
-const maxCacheAge = time.Hour * 24
-
 func main() {
 	config, parser := getConfig()
 	_, err := parser.Read()
@@ -83,7 +81,7 @@ func main() {
 		if err != nil {
 			log.Println("Error reading cache file, loading synchronously")
 			SelectSynchronously(*config, &selection, &selectionLock)
-		} else if time.Now().Sub(selection.Time) >= maxCacheAge {
+		} else if time.Now().After(NextLoadTime(selection.Time)) {
 			log.Println("Cache file is too old, loading synchronously")
 			SelectSynchronously(*config, &selection, &selectionLock)
 		} else {
@@ -91,10 +89,21 @@ func main() {
 		}
 	}
 
-	fmt.Println(selection)
+	time.AfterFunc(
+		NextLoadTime(selection.Time).Sub(time.Now()),
+		func() {
+			ticker := time.NewTicker(time.Hour * 24)
+			go func() {
+				<- ticker.C
+				SelectSynchronously(*config, &selection, &selectionLock)
+			}()
+			SelectSynchronously(*config, &selection, &selectionLock)
+		},
+	)
 
-	selectionChannel := StartSelector(*config, &selection, &selectionLock)
-	_ = selectionChannel
+	for {
+		time.Sleep(time.Minute)
+	}
 }
 
 func getConfig() (*Config, *conflag.Config) {
