@@ -90,10 +90,23 @@ func GetRequest(
 		DatasetData struct {
 			Data [][]interface{} `json:"data"`
 		} `json:"dataset_data"`
+		QuandlError struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"quandl_error"`
 	}{}
 	err = decoder.Decode(&result)
 
 	if err != nil {
+		return RequestResult{}, err
+	} else if result.QuandlError.Code != "" {
+		err := errorf(
+			fmt.Sprintf(
+				"Quandl error %s, %s",
+				result.QuandlError.Code,
+				result.QuandlError.Message,
+			),
+		)
 		return RequestResult{}, err
 	}
 

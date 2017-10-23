@@ -21,12 +21,17 @@ package main
 
 import (
 	"log"
+	"math/rand"
 	"os"
+	"sort"
 	"sync"
 	"time"
 )
 
 const maxQueuedSelections = 1024
+const selectTopN = 20
+
+type selectionList []DailySelection
 
 func StartSelector(
 	config Config,
@@ -48,14 +53,30 @@ func SelectSynchronously(
 	selection *DailySelection,
 	selectionLock *sync.RWMutex,
 ) {
-	selectionLock.Lock()
-	defer selectionLock.Unlock()
+	results := []DailySelection{}
+	fetchTime := time.Now()
+	RunLimited(func(set Dataset) {
+		result, err := GetRequest(config.APIKey, fetchTime, set)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
-	set := Datasets[0]
-	result, _ := GetRequest(config.APIKey, time.Now(), set)
-	*selection = DailySelection{set, result, time.Now()}
+		results = append(results, DailySelection{set, result, fetchTime})
+		log.Println(DailySelection{set, result, fetchTime})
+	})
+
+	sort.Sort(sort.Reverse(selectionList(results)))
+	for _, s := range results {
+		log.Printf("%s:%s %f", s.Database, s.Dataset.Dataset, s.NewValue/s.OldValue)
+	}
+
+	selectionLock.Lock()
+	*selection = results[rand.Intn(selectTopN)]
+	selectionLock.Unlock()
 
 	cacheFout, err := os.Create(config.TempFile)
+	defer cacheFout.Close()
 	if err != nil {
 		log.Println("Error opening selection cache file")
 	}
@@ -64,4 +85,16 @@ func SelectSynchronously(
 	if err != nil {
 		log.Println("Error writing selection cache")
 	}
+}
+
+func (l selectionList) Len() int {
+	return len(l)
+}
+
+func (l selectionList) Less(i, j int) bool {
+	return l[i].NewValue/l[i].OldValue < l[j].NewValue/l[j].OldValue
+}
+
+func (l selectionList) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
 }

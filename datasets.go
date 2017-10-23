@@ -31,9 +31,9 @@ type Dataset struct {
 
 // Limits defines the maximum number of requests per a given duration
 var Limits map[time.Duration]int = map[time.Duration]int{
-	10 * time.Second: 280,
-	10 * time.Minute: 1980,
-	24 * time.Hour:   49980,
+	10 * time.Second: 200,
+	10 * time.Minute: 1800,
+	24 * time.Hour:   49000,
 }
 
 // DataColumns tells us which column to read in any given database,

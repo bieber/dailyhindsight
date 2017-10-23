@@ -28,7 +28,7 @@ import (
 type DailySelection struct {
 	Dataset
 	RequestResult
-	time.Time
+	Time time.Time
 }
 
 func WriteBackup(fout io.Writer, selection DailySelection) error {

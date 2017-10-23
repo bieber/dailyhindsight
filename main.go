@@ -91,9 +91,10 @@ func main() {
 		}
 	}
 
+	fmt.Println(selection)
+
 	selectionChannel := StartSelector(*config, &selection, &selectionLock)
-	selectionChannel <- true
-	time.Sleep(time.Second)
+	_ = selectionChannel
 }
 
 func getConfig() (*Config, *conflag.Config) {
