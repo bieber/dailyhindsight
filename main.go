@@ -107,6 +107,7 @@ func main() {
 		"/",
 		Middleware(IndexHandler(*config, &selection, &selectionLock)),
 	)
+	http.Handle("/favicon.ico", Middleware(FaviconHandler()))
 	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 

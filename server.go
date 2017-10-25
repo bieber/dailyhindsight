@@ -20,6 +20,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/sebest/xff"
 	"html/template"
@@ -145,6 +146,27 @@ func IndexHandler(
 			err := indexTemplate.ExecuteTemplate(w, "index", data)
 			if err != nil {
 				panic(err)
+			}
+		},
+	)
+}
+
+func FaviconHandler() http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			data, err := Asset("favicon.ico")
+			if err != nil {
+				panic(err)
+			}
+
+			w.Header().Set("Content-Type", "image/x-icon")
+			n, err := w.Write(data)
+
+			if err != nil {
+				panic(err)
+			}
+			if n != len(data) {
+				panic(errors.New("Incomplete write of favicon"))
 			}
 		},
 	)
