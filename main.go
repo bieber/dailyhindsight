@@ -25,6 +25,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -94,16 +95,19 @@ func main() {
 		func() {
 			ticker := time.NewTicker(time.Hour * 24)
 			go func() {
-				<- ticker.C
+				<-ticker.C
 				SelectSynchronously(*config, &selection, &selectionLock)
 			}()
 			SelectSynchronously(*config, &selection, &selectionLock)
 		},
 	)
 
-	for {
-		time.Sleep(time.Minute)
-	}
+	log.Printf("Starting server on port %d\n", config.Port)
+	http.Handle(
+		"/",
+		Middleware(IndexHandler(*config, &selection, &selectionLock)),
+	)
+	http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil)
 }
 
 func getConfig() (*Config, *conflag.Config) {
