@@ -121,7 +121,19 @@ func Middleware(in http.Handler) http.Handler {
 	if err != nil {
 		panic(err)
 	}
-	return xffm.Handler(logged)
+	forwarded := xffm.Handler(logged)
+
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Println("PANIC:", err)
+				}
+			}()
+
+			forwarded.ServeHTTP(w, r)
+		},
+	)
 }
 
 func IndexHandler(
@@ -154,10 +166,7 @@ func IndexHandler(
 func FaviconHandler() http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			data, err := Asset("favicon.ico")
-			if err != nil {
-				panic(err)
-			}
+			data := MustAsset("favicon.ico")
 
 			w.Header().Set("Content-Type", "image/x-icon")
 			n, err := w.Write(data)
