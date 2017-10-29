@@ -95,8 +95,10 @@ func main() {
 		func() {
 			ticker := time.NewTicker(time.Hour * 24)
 			go func() {
-				<-ticker.C
-				SelectSynchronously(*config, &selection, &selectionLock)
+				for {
+					<-ticker.C
+					SelectSynchronously(*config, &selection, &selectionLock)
+				}
 			}()
 			SelectSynchronously(*config, &selection, &selectionLock)
 		},
