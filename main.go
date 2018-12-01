@@ -21,8 +21,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/bieber/conflag"
-	"golang.org/x/crypto/ssh/terminal"
+	"github.com/spf13/viper"
 	"log"
 	"math/rand"
 	"net/http"
@@ -32,41 +31,31 @@ import (
 )
 
 type Config struct {
-	Help     bool
-	Port     int
 	APIKey   string
 	TempFile string
-	LogFile  string
 }
 
 func main() {
-	config, parser := getConfig()
-	_, err := parser.Read()
-	if err != nil || config.Help {
-		exitCode := 0
+	viper.SetDefault("port", 80)
+	viper.SetDefault("temp_file", "cache")
 
-		if err != nil {
-			log.Println(err)
-			exitCode = 1
-		}
+	viper.BindEnv("port")
+	viper.BindEnv("api_key")
+	viper.BindEnv("temp_file")
 
-		if width, _, err := terminal.GetSize(0); err == nil {
-			fmt.Println(parser.Usage(uint(width)))
-		}
-		os.Exit(exitCode)
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./config")
+	viper.AddConfigPath("/run/secrets")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Printf("Couldn't load config file: %s", err.Error())
 	}
 
-	if config.LogFile != "" {
-		fout, err := os.OpenFile(
-			config.LogFile,
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-			0644,
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer fout.Close()
-		log.SetOutput(fout)
+	config := Config{
+		APIKey:   viper.GetString("api_key"),
+		TempFile: viper.GetString("temp_file"),
 	}
 
 	rand.Seed(time.Now().Unix())
@@ -75,16 +64,16 @@ func main() {
 
 	if cacheFin, err := os.Open(config.TempFile); err != nil {
 		log.Println("No cache file found, loading synchronously")
-		SelectSynchronously(*config, &selection, &selectionLock)
+		SelectSynchronously(config, &selection, &selectionLock)
 	} else {
 		selection, err = ReadBackup(cacheFin)
 		cacheFin.Close()
 		if err != nil {
 			log.Println("Error reading cache file, loading synchronously")
-			SelectSynchronously(*config, &selection, &selectionLock)
+			SelectSynchronously(config, &selection, &selectionLock)
 		} else if time.Now().After(NextLoadTime(selection.Time)) {
 			log.Println("Cache file is too old, loading synchronously")
-			SelectSynchronously(*config, &selection, &selectionLock)
+			SelectSynchronously(config, &selection, &selectionLock)
 		} else {
 			log.Println("Loaded cache from", selection.Time)
 		}
@@ -97,58 +86,20 @@ func main() {
 			go func() {
 				for {
 					<-ticker.C
-					SelectSynchronously(*config, &selection, &selectionLock)
+					SelectSynchronously(config, &selection, &selectionLock)
 				}
 			}()
-			SelectSynchronously(*config, &selection, &selectionLock)
+			SelectSynchronously(config, &selection, &selectionLock)
 		},
 	)
 
-	log.Printf("Starting server on port %d\n", config.Port)
+	log.Printf("Starting server on port %d\n", viper.GetInt("port"))
 	http.Handle(
 		"/",
-		Middleware(IndexHandler(*config, &selection, &selectionLock)),
+		Middleware(IndexHandler(config, &selection, &selectionLock)),
 	)
 	http.Handle("/favicon.ico", Middleware(FaviconHandler()))
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), nil))
-}
-
-func getConfig() (*Config, *conflag.Config) {
-	config := &Config{
-		Port:     8080,
-		TempFile: "cache",
-	}
-
-	parser, err := conflag.New(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	parser.ProgramName("dailyhindsight")
-	parser.ProgramDescription("HTTP server for Daily Hindsight")
-	parser.ConfigFileLongFlag("config")
-
-	parser.Field("Help").
-		ShortFlag('h').
-		Description("Print usage text and exit.")
-
-	parser.Field("Port").
-		ShortFlag('p').
-		Description("Port to serve HTTP traffic on.")
-
-	parser.Field("APIKey").
-		ShortFlag('k').
-		FileKey("api_key").
-		Required().
-		Description("API key for Quandl.")
-
-	parser.Field("TempFile").
-		ShortFlag('t').
-		Description("File to cache results for day in case server goes down.")
-
-	parser.Field("LogFile").
-		ShortFlag('l').
-		Description("Optional log output file (logs go to stderr by default)")
-
-	return config, parser
+	log.Fatal(
+		http.ListenAndServe(fmt.Sprintf(":%d", viper.GetInt("port")), nil),
+	)
 }
